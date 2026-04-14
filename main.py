@@ -57,6 +57,10 @@ def save_audit_log(app_id: str, verdict: str, reasoning: str, full_state: dict):
     except Exception as e:
         print(f"Database Logging Error: {e}")
 
+@app.get("/")
+async def root():
+    return {"message": "AI Underwriter API is online and orchestrating agents."}
+
 @app.post("/api/underwrite")
 async def process_application(applicant: ApplicantInfo):
     async def event_generator():
