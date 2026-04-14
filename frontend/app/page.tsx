@@ -30,8 +30,8 @@ export default function UnderwriterPage() {
     try {
       // REPLACE with your actual Render URL
       const response = await fetch('https://ai-credit-underwriter.onrender.com/api/underwrite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           applicant_id: data.applicationId,
           name: data.name,
