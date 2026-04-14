@@ -1,5 +1,10 @@
+from fastapi.responses import StreamingResponse
+import json
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+
 from schema import ApplicantInfo
 from graph import underwriting_app
 import uvicorn
@@ -54,29 +59,25 @@ def save_audit_log(app_id: str, verdict: str, reasoning: str, full_state: dict):
 
 @app.post("/api/underwrite")
 async def process_application(applicant: ApplicantInfo):
-    try:
+    async def event_generator():
         initial_state = {"applicant_info": applicant}
-        final_state = underwriting_app.invoke(initial_state)
         
-        serializable_state = {}
-        for k, v in final_state.items():
-            if hasattr(v, "model_dump"):
-                serializable_state[k] = v.model_dump()
-            else:
-                serializable_state[k] = v
-                
-        # --- NEW: Save the result to SQLite right before sending to the user ---
-        save_audit_log(
-            app_id=applicant.applicant_id,
-            verdict=serializable_state.get("final_decision", "Unknown"),
-            reasoning=serializable_state.get("decision_reasoning", "No reasoning provided"),
-            full_state=serializable_state
-        )
-                
-        return serializable_state
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # We use the .stream method to get updates as each node finishes
+        async for event in underwriting_app.astream(initial_state, stream_mode="updates"):
+            # Extract the node name and the data produced
+            node_name = list(event.keys())[0]
+            data = event[node_name]
+            
+            # Formulate a small "chunk" to send to the UI
+            chunk = {
+                "node": node_name,
+                "data": data,
+                "status": "processing"
+            }
+            yield f"data: {json.dumps(chunk)}\n\n"
+            await asyncio.sleep(0.1) # Small delay for UI smoothness
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 if __name__ == "__main__":
     import uvicorn
