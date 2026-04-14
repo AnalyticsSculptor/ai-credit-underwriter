@@ -23,7 +23,7 @@ export default function UnderwriterDashboard() {
     
     try {
       // Connecting to your FastAPI Backend
-      const response = await fetch('https://ai-underwriter-api.onrender.com/api/underwrite', {
+      const response = await fetch('https://ai-credit-underwriter.onrender.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
