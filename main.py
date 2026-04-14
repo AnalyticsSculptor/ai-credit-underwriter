@@ -1,4 +1,6 @@
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
+
 import json
 import asyncio
 from fastapi import FastAPI, HTTPException
@@ -78,6 +80,7 @@ async def process_application(applicant: ApplicantInfo):
                 "data": data,
                 "status": "processing"
             }
+            safe_chunk = jsonable_encoder(chunk)
             yield f"data: {json.dumps(chunk)}\n\n"
             await asyncio.sleep(0.1) # Small delay for UI smoothness
 
