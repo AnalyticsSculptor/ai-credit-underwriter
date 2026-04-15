@@ -14,41 +14,56 @@ def coordinator_node(state: UnderwritingState) -> dict:
     """
     print("--- 👔 COORDINATOR: Finalizing Decision ---")
     
-    risk = state.get("risk_assessment")
+    risk = state.get("risk_assessment", {})
     compliance_passed = state.get("compliance_passed", False)
     compliance_flags = state.get("compliance_flags", [])
+    
+    # Grab the data from previous agents to send to the frontend!
+    bureau_data = state.get("bureau_data", {})
+    compliance_check = state.get("compliance_check", {})
     
     # Safely handle compliance flags if the LLM returned a string
     if isinstance(compliance_flags, str):
         compliance_flags = [compliance_flags]
         
-    # NEW FIX: Safely extract risk tier and factors whether 'risk' is a dict or a Pydantic object
+    # Safely extract risk tier and factors whether 'risk' is a dict or a Pydantic object
     risk_tier = risk.get("risk_tier", "Unknown") if isinstance(risk, dict) else getattr(risk, "risk_tier", "Unknown")
     key_factors = risk.get("key_factors", []) if isinstance(risk, dict) else getattr(risk, "key_factors", [])
     
+    # 🧳 THE FIX: Helper function to pack the suitcase for the frontend
+    def build_final_payload(decision, reasoning):
+        return {
+            "final_decision": decision,
+            "decision_reasoning": reasoning,
+            "bureau_data": bureau_data,
+            "risk_assessment": risk,
+            "compliance_check": compliance_check
+        }
+    
     # Rule 1: Compliance is a hard guardrail.
     if not compliance_passed:
-        return {
-            "final_decision": "Escalated",
-            "decision_reasoning": f"Failed regulatory compliance. Flags: {', '.join(compliance_flags)}"
-        }
+        return build_final_payload(
+            "Escalated", 
+            f"Failed regulatory compliance. Flags: {', '.join(compliance_flags)}"
+        )
     
     # Rule 2: Route based on dynamic risk tier
     if risk_tier.lower() == "high":
-        return {
-            "final_decision": "Declined",
-            "decision_reasoning": f"Declined due to High Risk. Factors: {', '.join(key_factors)}"
-        }
+        return build_final_payload(
+            "Declined", 
+            f"Declined due to High Risk. Factors: {', '.join(key_factors)}"
+        )
     elif risk_tier.lower() == "medium":
-        return {
-            "final_decision": "Escalated",
-            "decision_reasoning": "Medium risk profile requires human underwriter review."
-        }
+        return build_final_payload(
+            "Escalated", 
+            "Medium risk profile requires human underwriter review."
+        )
     else:
-        return {
-            "final_decision": "Approved",
-            "decision_reasoning": "Approved. Low risk profile and passed all compliance checks."
-        }
+        return build_final_payload(
+            "Approved", 
+            "Approved. Low risk profile and passed all compliance checks."
+        )
+
 # ==========================================
 # 🕸️ BUILD THE LANGGRAPH WORKFLOW
 # ==========================================
