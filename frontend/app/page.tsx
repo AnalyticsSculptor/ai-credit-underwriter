@@ -136,7 +136,10 @@ export default function UnderwriterPage() {
                 confidence={analysisResults.risk_assessment?.dynamic_risk_score ? +(analysisResults.risk_assessment.dynamic_risk_score / 10).toFixed(1) : 0}
                 reasoning={analysisResults.decision_reasoning || "Analysis complete."}
               />
-              
+              {/* TEMPORARY DEBUG TEXT - Put this right above AnalysisResults */}
+<pre className="p-4 mb-4 bg-black/50 border border-green-500/30 rounded-xl text-green-400 text-xs overflow-auto max-h-[300px]">
+  {JSON.stringify(analysisResults, null, 2)}
+</pre>
               <AnalysisResults 
                 data={analysisResults.bureau_data || {}}
                 riskAssessment={analysisResults.risk_assessment || {}}
