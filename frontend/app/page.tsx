@@ -28,10 +28,9 @@ export default function UnderwriterPage() {
     setActiveNode("initializing")
 
     try {
-      // REPLACE with your actual Render URL
       const response = await fetch('https://ai-credit-underwriter.onrender.com/api/underwrite', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           applicant_id: data.applicationId,
           name: data.name,
@@ -60,10 +59,13 @@ export default function UnderwriterPage() {
           if (line.startsWith('data: ')) {
             try {
               const payload = JSON.parse(line.replace('data: ', ''))
+              
+              if (payload.node === "__end__" || payload.node === "error") continue;
+              
               setActiveNode(payload.node)
 
-              // Check for the final coordinator node to show results
               if (payload.node === "coordinator_node" || payload.node === "coordinator") {
+                console.log("Safely received data:", payload.data)
                 setAnalysisResults(payload.data)
               }
             } catch (e) {
@@ -80,6 +82,8 @@ export default function UnderwriterPage() {
       setActiveNode(null)
     }
   }
+
+  const isDataReady = analysisResults && analysisResults.final_decision;
 
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden font-sans">
@@ -113,21 +117,25 @@ export default function UnderwriterPage() {
                 {activeNode === 'initializing' && "Initializing Agents..."}
               </h3>
             </div>
-          ) : (
+          ) : isDataReady ? (
             <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <VerdictCard 
                 applicantName={submittedData?.name || "Applicant"}
                 applicationId={submittedData?.applicationId || "N/A"}
-                verdict={analysisResults.final_decision}
+                verdict={String(analysisResults.final_decision).toUpperCase() as any}
                 confidence={analysisResults.risk_assessment?.dynamic_risk_score ? +(analysisResults.risk_assessment.dynamic_risk_score / 10).toFixed(1) : 0}
-                reasoning={analysisResults.decision_reasoning}
+                reasoning={analysisResults.decision_reasoning || "Analysis complete."}
               />
               
               <AnalysisResults 
-                data={analysisResults.bureau_data}
-                riskAssessment={analysisResults.risk_assessment}
-                compliance={analysisResults.compliance_check}
+                data={analysisResults.bureau_data || {}}
+                riskAssessment={analysisResults.risk_assessment || {}}
+                compliance={analysisResults.compliance_check || {}}
               />
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center">
+               <p className="text-red-400">Error rendering results. Check console for data format.</p>
             </div>
           )}
         </div>
