@@ -15,6 +15,17 @@ export interface ApplicantData {
   fileName: string | null
 }
 
+// THE FIX: This guarantees the output perfectly matches the VerdictCard dictionary
+const formatVerdict = (rawVerdict: any): "approved" | "declined" | "escalated" => {
+  if (!rawVerdict) return "escalated" // Fallback to manual review
+  const normalized = String(rawVerdict).toLowerCase()
+  
+  if (normalized.includes("approve")) return "approved"
+  if (normalized.includes("decline") || normalized.includes("reject")) return "declined"
+  
+  return "escalated" // Default fallback
+}
+
 export default function UnderwriterPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResults, setAnalysisResults] = useState<any>(null)
@@ -65,7 +76,6 @@ export default function UnderwriterPage() {
               setActiveNode(payload.node)
 
               if (payload.node === "coordinator_node" || payload.node === "coordinator") {
-                console.log("Safely received data:", payload.data)
                 setAnalysisResults(payload.data)
               }
             } catch (e) {
@@ -122,7 +132,7 @@ export default function UnderwriterPage() {
               <VerdictCard 
                 applicantName={submittedData?.name || "Applicant"}
                 applicationId={submittedData?.applicationId || "N/A"}
-                verdict={String(analysisResults.final_decision).toUpperCase() as any}
+                verdict={formatVerdict(analysisResults.final_decision)}
                 confidence={analysisResults.risk_assessment?.dynamic_risk_score ? +(analysisResults.risk_assessment.dynamic_risk_score / 10).toFixed(1) : 0}
                 reasoning={analysisResults.decision_reasoning || "Analysis complete."}
               />
