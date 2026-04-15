@@ -12,10 +12,13 @@ export function AnalysisResults({ data = {}, riskAssessment = {}, compliance = {
   // 1. SMART MAPPING: Look for common AI output names and provide safe fallbacks
   
   // Bureau Data Fallbacks
-  const cibilScore = data?.cibil_score || data?.score || "N/A";
-  const creditAge = data?.credit_age_years || data?.credit_age || "N/A";
+  const cibilScore = data?.bureau_score || data?.cibil_score || data?.score || "N/A";
+  const creditAge = data?.credit_history_length_years || data?.credit_age_years || data?.credit_age || "N/A";
   const inquiries = data?.total_inquiries || data?.recent_inquiries || 0;
-  const accountHealth = data?.account_health || (data?.delinquencies === 0 ? "No Delinquencies" : "Review Required");
+  
+  // Safely check delinquencies (since 0 is technically a "falsy" value in JavaScript)
+  const delinquencies = data?.recent_delinquencies ?? data?.delinquencies;
+  const accountHealth = data?.account_health || (delinquencies === 0 ? "No Delinquencies" : (delinquencies > 0 ? "Review Required" : "Pending Audit"));
 
   // Risk Assessment Fallbacks
   const dynamicRisk = riskAssessment?.dynamic_risk_score || riskAssessment?.risk_score || "N/A";

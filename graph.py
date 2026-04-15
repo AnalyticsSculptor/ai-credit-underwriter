@@ -18,19 +18,37 @@ def coordinator_node(state: UnderwritingState) -> dict:
     compliance_passed = state.get("compliance_passed", False)
     compliance_flags = state.get("compliance_flags", [])
     
-    # Grab the data from previous agents to send to the frontend!
     bureau_data = state.get("bureau_data", {})
     compliance_check = state.get("compliance_check", {})
+    applicant = state.get("applicant_info")
     
-    # Safely handle compliance flags if the LLM returned a string
+    # --- 🛠️ NEW: Failsafe DTI Calculator ---
+    # If the AI forgot to calculate DTI, we catch it and do the math ourselves
+    if isinstance(risk, dict) and risk.get("dti_ratio") is None:
+        # Try to grab the debt number the AI generated
+        raw_debt = risk.get("total_debt", bureau_data.get("total_debt", 0))
+        
+        # Safely grab the annual income
+        annual_income = applicant.get("annual_income", 1) if isinstance(applicant, dict) else getattr(applicant, "annual_income", 1)
+        
+        if 0 < raw_debt < 100:
+            # If the AI generated a number like "28.4", it's already a percentage
+            risk["dti_ratio"] = round(float(raw_debt), 1)
+        else:
+            # Standard Math: (Monthly Debt / Monthly Income) * 100
+            monthly_income = max(annual_income / 12, 1)
+            calculated_dti = (float(raw_debt) / monthly_income) * 100
+            
+            # Cap it so it doesn't look crazy if the AI hallucinates a huge number
+            risk["dti_ratio"] = min(round(calculated_dti, 1), 99.9)
+
+    # Safely handle compliance flags
     if isinstance(compliance_flags, str):
         compliance_flags = [compliance_flags]
         
-    # Safely extract risk tier and factors whether 'risk' is a dict or a Pydantic object
     risk_tier = risk.get("risk_tier", "Unknown") if isinstance(risk, dict) else getattr(risk, "risk_tier", "Unknown")
     key_factors = risk.get("key_factors", []) if isinstance(risk, dict) else getattr(risk, "key_factors", [])
     
-    # 🧳 THE FIX: Helper function to pack the suitcase for the frontend
     def build_final_payload(decision, reasoning):
         return {
             "final_decision": decision,
@@ -40,29 +58,16 @@ def coordinator_node(state: UnderwritingState) -> dict:
             "compliance_check": compliance_check
         }
     
-    # Rule 1: Compliance is a hard guardrail.
+    # Routing Rules
     if not compliance_passed:
-        return build_final_payload(
-            "Escalated", 
-            f"Failed regulatory compliance. Flags: {', '.join(compliance_flags)}"
-        )
+        return build_final_payload("Escalated", f"Failed regulatory compliance. Flags: {', '.join(compliance_flags)}")
     
-    # Rule 2: Route based on dynamic risk tier
     if risk_tier.lower() == "high":
-        return build_final_payload(
-            "Declined", 
-            f"Declined due to High Risk. Factors: {', '.join(key_factors)}"
-        )
+        return build_final_payload("Declined", f"Declined due to High Risk. Factors: {', '.join(key_factors)}")
     elif risk_tier.lower() == "medium":
-        return build_final_payload(
-            "Escalated", 
-            "Medium risk profile requires human underwriter review."
-        )
+        return build_final_payload("Escalated", "Medium risk profile requires human underwriter review.")
     else:
-        return build_final_payload(
-            "Approved", 
-            "Approved. Low risk profile and passed all compliance checks."
-        )
+        return build_final_payload("Approved", "Approved. Low risk profile and passed all compliance checks.")
 
 # ==========================================
 # 🕸️ BUILD THE LANGGRAPH WORKFLOW
